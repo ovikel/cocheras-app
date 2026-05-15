@@ -293,8 +293,8 @@ function AdminView({ onLogout }) {
   const [newCochera, setNewCochera] = useState({ nombre: "", tipo: "auto", monto_mensual: "" });
 
   useEffect(() => {
-    supabase.from("clientes").select("*").order("nombre").then(({ data }) => {
-      setClientes(data || []);
+    supabase.from("clientes").select("*").order("nombre", { nullsFirst: false }).then(({ data }) => {
+      setClientes((data || []).filter(c => c.nombre));
       setLoadingClientes(false);
     });
   }, []);
@@ -329,8 +329,9 @@ function AdminView({ onLogout }) {
 
   const addCliente = async () => {
     if (!newCliente.nombre || !newCliente.email) return;
-    const { data } = await supabase.from("clientes").insert({ ...newCliente, activo: true }).select().single();
-    setClientes(prev => [...prev, data].sort((a,b) => a.nombre.localeCompare(b.nombre)));
+    const { data, error } = await supabase.from("clientes").insert({ ...newCliente, activo: true }).select().single();
+    if (error) { alert("Error al guardar: " + error.message); return; }
+    if (data) setClientes(prev => [...prev, data].sort((a,b) => (a.nombre||"").localeCompare(b.nombre||"")));
     setShowAddCliente(false);
     setNewCliente({ nombre: "", email: "", password: "1234" });
   };
