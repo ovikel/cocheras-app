@@ -352,10 +352,23 @@ function AdminView({ onLogout }) {
 
         {loadingClientes ? <div style={{ color: "#444", fontSize: 13, padding: 8 }}>Cargando...</div>
         : clientes.map(c => (
-          <div key={c.id} onClick={() => selectCliente(c)}
-            style={{ padding: "12px 14px", borderRadius: 10, marginBottom: 5, cursor: "pointer", background: selected?.id===c.id ? "#131e35" : "transparent", border: selected?.id===c.id ? "1px solid #1e3a5f" : "1px solid transparent" }}>
-            <div style={{ fontWeight: 600, color: "#fff", fontSize: 14 }}>{c.nombre}</div>
-            <div style={{ fontSize: 12, color: "#555", marginTop: 2 }}>Cochera {c.cochera}</div> <button   onClick={async (e) => {     e.stopPropagation();     if (!confirm(`¿Eliminár a ${c.nombre}? Se borrarán todos sus pagos.`)) return;     await supabase.from("clientes").delete().eq("id", c.id);     setClientes(prev => prev.filter(x => x.id !== c.id));     if (selected?.id === c.id) setSelected(null);   }}   style={{ marginTop: 4, background: "transparent", color: "#ef4444", fontSize: 11, fontWeight: 600, padding: 0 }}>   🗑 Eliminar </button>
+          <div key={c.id}
+            style={{ padding: "12px 14px", borderRadius: 10, marginBottom: 5, background: selected?.id===c.id ? "#131e35" : "transparent", border: selected?.id===c.id ? "1px solid #1e3a5f" : "1px solid transparent" }}>
+            <div onClick={() => selectCliente(c)} style={{ cursor: "pointer" }}>
+              <div style={{ fontWeight: 600, color: "#fff", fontSize: 14 }}>{c.nombre}</div>
+              <div style={{ fontSize: 12, color: "#555", marginTop: 2 }}>Cochera {c.cochera}</div>
+            </div>
+            <button
+              onClick={async (e) => {
+                e.stopPropagation();
+                if (!window.confirm(`¿Eliminar a ${c.nombre}? Se borrarán todos sus pagos.`)) return;
+                await supabase.from("clientes").delete().eq("id", c.id);
+                setClientes(prev => prev.filter(x => x.id !== c.id));
+                if (selected?.id === c.id) setSelected(null);
+              }}
+              style={{ marginTop: 6, background: "transparent", color: "#ef4444", fontSize: 11, fontWeight: 600, padding: 0, border: "none", cursor: "pointer" }}>
+              🗑 Eliminar cliente
+            </button>
           </div>
         ))}
       </div>
