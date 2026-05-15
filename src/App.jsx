@@ -39,7 +39,7 @@ function Login({ onLogin }) {
     const { data, error } = await supabase.from("clientes").select("*").eq("email", email).single();
     if (error || !data) {
       setErr("Email no encontrado");
-    } else if (pass !== "1234") {
+    } else if (pass !== data.password) {
       setErr("Contraseña incorrecta");
     } else {
       onLogin({ ...data, role: "client" });
