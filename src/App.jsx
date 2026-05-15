@@ -22,6 +22,70 @@ const Badge = ({ status }) => {
   );
 };
 
+// ── MODAL CAMBIO DE CONTRASEÑA ─────────────────────────────────────────────
+function ModalCambioPassword({ user, onClose }) {
+  const [actual, setActual] = useState("");
+  const [nueva, setNueva] = useState("");
+  const [confirmar, setConfirmar] = useState("");
+  const [err, setErr] = useState("");
+  const [ok, setOk] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleGuardar = async () => {
+    setErr("");
+    if (actual !== user.password) { setErr("La contraseña actual es incorrecta"); return; }
+    if (nueva.length < 4) { setErr("La nueva contraseña debe tener al menos 4 caracteres"); return; }
+    if (nueva !== confirmar) { setErr("Las contraseñas no coinciden"); return; }
+    setLoading(true);
+    const { error } = await supabase.from("clientes").update({ password: nueva }).eq("id", user.id);
+    if (error) { setErr("Error al guardar. Intentá de nuevo."); }
+    else { setOk(true); setTimeout(onClose, 1500); }
+    setLoading(false);
+  };
+
+  const inputStyle = { width: "100%", background: "#0d0d14", border: "1px solid #2a2a3e", borderRadius: 10, padding: "11px 14px", color: "#fff", fontSize: 14, outline: "none", marginBottom: 12 };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
+      <div style={{ background: "#111118", border: "1px solid #1e1e2e", borderRadius: 20, padding: 36, width: 380, boxShadow: "0 30px 60px rgba(0,0,0,.5)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+          <h3 style={{ fontFamily: "'Syne',sans-serif", fontSize: 18, fontWeight: 800, color: "#fff" }}>Cambiar contraseña</h3>
+          <button onClick={onClose} style={{ background: "transparent", color: "#555", fontSize: 20, lineHeight: 1 }}>×</button>
+        </div>
+
+        {ok ? (
+          <div style={{ textAlign: "center", padding: "20px 0" }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
+            <div style={{ color: "#10b981", fontWeight: 700 }}>¡Contraseña actualizada!</div>
+          </div>
+        ) : (
+          <>
+            {[
+              { label: "Contraseña actual", val: actual, set: setActual },
+              { label: "Nueva contraseña", val: nueva, set: setNueva },
+              { label: "Confirmar nueva contraseña", val: confirmar, set: setConfirmar },
+            ].map(f => (
+              <div key={f.label}>
+                <label style={{ display: "block", color: "#aaa", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>{f.label}</label>
+                <input type="password" value={f.val} onChange={e => { f.set(e.target.value); setErr(""); }} style={inputStyle}
+                  onFocus={e => e.target.style.borderColor = "#7c3aed"} onBlur={e => e.target.style.borderColor = "#2a2a3e"} />
+              </div>
+            ))}
+            {err && <p style={{ color: "#f87171", fontSize: 13, marginBottom: 12 }}>{err}</p>}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={onClose} style={{ flex: 1, padding: "11px", background: "#1a1a28", color: "#aaa", borderRadius: 10, fontWeight: 600, fontSize: 14 }}>Cancelar</button>
+              <button onClick={handleGuardar} disabled={loading} style={{ flex: 1, padding: "11px", background: "linear-gradient(135deg,#7c3aed,#4f46e5)", color: "#fff", borderRadius: 10, fontWeight: 700, fontSize: 14, opacity: loading ? .7 : 1 }}>
+                {loading ? "Guardando..." : "Guardar"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── LOGIN ─────────────────────────────────────────────────────────────────────
 function Login({ onLogin }) {
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
@@ -77,19 +141,19 @@ function Login({ onLogin }) {
           style={{ width: "100%", padding: "14px", background: "linear-gradient(135deg, #7c3aed, #4f46e5)", color: "#fff", borderRadius: 10, fontWeight: 700, fontSize: 15, marginTop: 8, opacity: loading ? .7 : 1 }}>
           {loading ? "Ingresando..." : "Ingresar"}
         </button>
-        <p style={{ color: "#444", fontSize: 12, textAlign: "center", marginTop: 20 }}>
-          Clientes: su email / 1234 &nbsp;|&nbsp; Admin: admin@cocheras.com / admin123
-        </p>
       </div>
     </div>
   );
 }
 
+// ── CLIENT VIEW ───────────────────────────────────────────────────────────────
 function ClientView({ user, onLogout }) {
   const [pagos, setPagos] = useState([]);
   const [tab, setTab] = useState("todos");
   const [loading, setLoading] = useState(true);
   const [payingId, setPayingId] = useState(null);
+  const [showCambioPass, setShowCambioPass] = useState(false);
+  const [currentUser, setCurrentUser] = useState(user);
 
   const fetchPagos = async () => {
     const { data } = await supabase.from("pagos").select("*").eq("cliente_id", user.id).order("anio").order("mes");
@@ -113,14 +177,27 @@ function ClientView({ user, onLogout }) {
   return (
     <div style={{ minHeight: "100vh", background: "#0a0a0f", fontFamily: "'DM Sans', sans-serif", color: "#e5e5e5" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@700;800&display=swap'); *{box-sizing:border-box;margin:0;padding:0;} button{cursor:pointer;border:none;} ::-webkit-scrollbar{width:6px;} ::-webkit-scrollbar-track{background:#111;} ::-webkit-scrollbar-thumb{background:#333;border-radius:3px;}`}</style>
+
+      {showCambioPass && (
+        <ModalCambioPassword
+          user={currentUser}
+          onClose={() => {
+            setShowCambioPass(false);
+            // refrescar usuario con nueva contraseña
+            supabase.from("clientes").select("*").eq("id", user.id).single().then(({ data }) => { if (data) setCurrentUser({ ...data, role: "client" }); });
+          }}
+        />
+      )}
+
       <div style={{ background: "#111118", borderBottom: "1px solid #1e1e2e", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, color: "#fff", fontWeight: 800 }}>🅿️ CocherasApp</span>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ textAlign: "right" }}>
             <div style={{ fontWeight: 600, fontSize: 14, color: "#fff" }}>{user.nombre}</div>
             <div style={{ fontSize: 12, color: "#666" }}>Cochera {user.cochera}</div>
           </div>
           <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#7c3aed,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "#fff" }}>{user.nombre[0]}</div>
+          <button onClick={() => setShowCambioPass(true)} style={{ background: "#1a1a28", color: "#aaa", padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600 }}>🔑 Contraseña</button>
           <button onClick={onLogout} style={{ background: "#1a1a28", color: "#aaa", padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600 }}>Salir</button>
         </div>
       </div>
@@ -151,7 +228,7 @@ function ClientView({ user, onLogout }) {
           {loading ? <div style={{ textAlign: "center", color: "#555", padding: 40 }}>Cargando pagos...</div>
           : lista.length === 0 ? <div style={{ textAlign: "center", color: "#555", padding: 40 }}>No hay pagos en esta categoría</div>
           : lista.map((p, i) => (
-            <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: i < lista.length-1 ? "1px solid #1a1a28" : "none" }}>
+            <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", borderBottom: i<lista.length-1 ? "1px solid #1a1a28" : "none" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: p.estado==="pagado" ? "#052e16" : "#431407", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>
                   {p.estado === "pagado" ? "✅" : "📋"}
@@ -183,6 +260,7 @@ function ClientView({ user, onLogout }) {
   );
 }
 
+// ── ADMIN VIEW ────────────────────────────────────────────────────────────────
 function AdminView({ onLogout }) {
   const [clientes, setClientes] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -193,7 +271,7 @@ function AdminView({ onLogout }) {
   const [showAddPago, setShowAddPago] = useState(false);
   const [showAddCliente, setShowAddCliente] = useState(false);
   const [newPago, setNewPago] = useState({ mes: "Enero", anio: new Date().getFullYear(), monto: "" });
-  const [newCliente, setNewCliente] = useState({ nombre: "", email: "", cochera: "", monto_mensual: "" });
+  const [newCliente, setNewCliente] = useState({ nombre: "", email: "", cochera: "", monto_mensual: "", password: "1234" });
 
   useEffect(() => {
     supabase.from("clientes").select("*").order("nombre").then(({ data }) => {
@@ -231,7 +309,7 @@ function AdminView({ onLogout }) {
     const { data } = await supabase.from("clientes").insert({ ...newCliente, monto_mensual: Number(newCliente.monto_mensual), activo: true }).select().single();
     setClientes(prev => [...prev, data].sort((a,b) => a.nombre.localeCompare(b.nombre)));
     setShowAddCliente(false);
-    setNewCliente({ nombre: "", email: "", cochera: "", monto_mensual: "" });
+    setNewCliente({ nombre: "", email: "", cochera: "", monto_mensual: "", password: "1234" });
   };
 
   const inputStyle = { background: "#080b10", border: "1px solid #1a2030", borderRadius: 8, padding: "9px 14px", color: "#fff", fontSize: 14, outline: "none" };
@@ -242,7 +320,6 @@ function AdminView({ onLogout }) {
     <div style={{ minHeight: "100vh", background: "#080b10", fontFamily: "'DM Sans', sans-serif", color: "#e5e5e5" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@700;800&display=swap'); *{box-sizing:border-box;margin:0;padding:0;} button{cursor:pointer;border:none;} select,input{outline:none;} ::-webkit-scrollbar{width:5px;} ::-webkit-scrollbar-track{background:#0d1117;} ::-webkit-scrollbar-thumb{background:#1e3a5f;border-radius:3px;}`}</style>
 
-      {/* Header */}
       <div style={{ background: "#0d1117", borderBottom: "1px solid #1a2030", padding: "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "fixed", top: 0, left: 0, right: 0, zIndex: 10 }}>
         <span style={{ fontFamily: "'Syne',sans-serif", fontSize: 20, color: "#fff", fontWeight: 800 }}>
           🅿️ CocherasApp <span style={{ fontSize: 11, color: "#3b82f6", background: "#1e3a5f", padding: "2px 8px", borderRadius: 20, marginLeft: 6 }}>ADMIN</span>
@@ -250,7 +327,6 @@ function AdminView({ onLogout }) {
         <button onClick={onLogout} style={{ background: "#1a2030", color: "#aaa", padding: "7px 14px", borderRadius: 8, fontSize: 13, fontWeight: 600 }}>Salir</button>
       </div>
 
-      {/* Sidebar */}
       <div style={{ width: 270, background: "#0d1117", borderRight: "1px solid #1a2030", position: "fixed", top: 65, left: 0, bottom: 0, overflowY: "auto", padding: "20px 12px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, paddingLeft: 4 }}>
           <span style={{ color: "#3b82f6", fontSize: 11, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase" }}>Clientes</span>
@@ -264,6 +340,7 @@ function AdminView({ onLogout }) {
               { ph: "Email", key: "email" },
               { ph: "Cochera (ej: A-01)", key: "cochera" },
               { ph: "Monto mensual $", key: "monto_mensual" },
+              { ph: "Contraseña inicial", key: "password" },
             ].map(f => (
               <input key={f.key} placeholder={f.ph} value={newCliente[f.key]}
                 onChange={e => setNewCliente({...newCliente, [f.key]: e.target.value})}
@@ -283,7 +360,6 @@ function AdminView({ onLogout }) {
         ))}
       </div>
 
-      {/* Main */}
       <div style={{ marginLeft: 270, padding: "90px 32px 40px" }}>
         {!selected ? (
           <>
