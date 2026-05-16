@@ -381,6 +381,7 @@ function AdminView({ onLogout }) {
   const [showSidebar, setShowSidebar] = useState(!isMobile);
   const [showAddPago, setShowAddPago] = useState(false);
   const [showAddCliente, setShowAddCliente] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
   const [showAddCochera, setShowAddCochera] = useState(false);
   const [newPago, setNewPago] = useState({ mes: "Enero", anio: new Date().getFullYear(), monto: "" });
   const [newCliente, setNewCliente] = useState({ nombre: "", email: "", password: "1234" });
@@ -459,6 +460,7 @@ function AdminView({ onLogout }) {
     fetchDetalle(selected.id);
   };
 
+  const clientesFiltrados = clientes.filter(c => c.nombre.toLowerCase().includes(busqueda.toLowerCase()));
   const inp = { background: "#080b10", border: "1px solid #1a2030", borderRadius: 8, padding: "9px 12px", color: "#fff", fontSize: 14, outline: "none" };
   const totalMensual = cocheras.reduce((a,c) => a + Number(c.monto_mensual), 0);
   const totalPagados = pagos.filter(p=>p.estado==="pagado").reduce((a,p)=>a+Number(p.monto),0);
@@ -500,6 +502,20 @@ function AdminView({ onLogout }) {
           <button onClick={() => setShowAddCliente(!showAddCliente)} style={{ background: "#1e3a5f", color: "#60a5fa", padding: "3px 10px", borderRadius: 6, fontSize: 12, fontWeight: 700 }}>+ Nuevo</button>
         </div>
 
+        {/* Buscador */}
+        <div style={{ position: "relative", marginBottom: 10 }}>
+          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#555", fontSize: 14 }}>🔍</span>
+          <input
+            placeholder="Buscar cliente..."
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+            style={{ width: "100%", background: "#080b10", border: "1px solid #1a2030", borderRadius: 8, padding: "8px 10px 8px 30px", color: "#fff", fontSize: 13, outline: "none" }}
+          />
+          {busqueda && (
+            <button onClick={() => setBusqueda("")} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "transparent", color: "#555", fontSize: 16, border: "none", cursor: "pointer", lineHeight: 1 }}>×</button>
+          )}
+        </div>
+
         {showAddCliente && (
           <div style={{ background: "#080b10", border: "1px solid #1a2030", borderRadius: 10, padding: 10, marginBottom: 10 }}>
             {[["Nombre completo","nombre"],["Email","email"],["Contraseña inicial","password"]].map(([ph, key]) => (
@@ -512,7 +528,8 @@ function AdminView({ onLogout }) {
         )}
 
         {loadingClientes ? <div style={{ color: "#444", fontSize: 13, padding: 8 }}>Cargando...</div>
-        : clientes.map(c => (
+        : clientesFiltrados.length === 0 ? <div style={{ color: "#555", fontSize: 13, padding: 8, textAlign: "center" }}>Sin resultados</div>
+        : clientesFiltrados.map(c => (
           <div key={c.id} style={{ padding: "10px 12px", borderRadius: 10, marginBottom: 4, background: selected?.id===c.id ? "#131e35" : "transparent", border: selected?.id===c.id ? "1px solid #1e3a5f" : "1px solid transparent" }}>
             <div onClick={() => selectCliente(c)} style={{ cursor: "pointer" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -542,10 +559,14 @@ function AdminView({ onLogout }) {
           <>
             <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: isMobile ? 20 : 24, fontWeight: 800, color: "#fff", marginBottom: 20 }}>Panel de control</h2>
             <div style={{ background: "#0d1117", border: "1px solid #1a2030", borderRadius: 16, padding: isMobile ? 16 : 24 }}>
-              <div style={{ fontWeight: 600, color: "#666", marginBottom: 14, fontSize: 14 }}>
-                {isMobile ? "Tocá ☰ para ver clientes" : "Seleccioná un cliente del panel izquierdo"}
+              <div style={{ position: "relative", marginBottom: 16 }}>
+                <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#555", fontSize: 16 }}>🔍</span>
+                <input placeholder="Buscar cliente..." value={busqueda} onChange={e => setBusqueda(e.target.value)}
+                  style={{ width: "100%", background: "#080b10", border: "1px solid #1a2030", borderRadius: 10, padding: "12px 12px 12px 38px", color: "#fff", fontSize: 14, outline: "none" }} />
+                {busqueda && <button onClick={() => setBusqueda("")} style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "transparent", color: "#555", fontSize: 20, border: "none", cursor: "pointer" }}>×</button>}
               </div>
-              {clientes.map((c, i) => (
+              {clientesFiltrados.length === 0 ? <div style={{ color: "#555", textAlign: "center", padding: 20 }}>Sin resultados</div> : null}
+              {clientesFiltrados.map((c, i) => (
                 <div key={c.id} onClick={() => selectCliente(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: i<clientes.length-1 ? "1px solid #151d2a" : "none", cursor: "pointer" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#1e3a5f,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "#fff", flexShrink: 0 }}>{c.nombre[0]}</div>
