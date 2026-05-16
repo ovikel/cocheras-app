@@ -827,7 +827,7 @@ function AdminView({ onLogout }) {
                 </div>
               ))}
             </div>
-            </div>}
+          </div>}
           </>
         ) : (
           <>
