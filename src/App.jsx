@@ -804,7 +804,8 @@ function AdminView({ onLogout }) {
               <div style={{ textAlign: "center", color: "#555", padding: 40 }}>Cargando analítico...</div>
             )}
 
-            {tabPanel === "clientes" && <div style={{ background: "#0d1117", border: "1px solid #1a2030", borderRadius: 16, padding: isMobile ? 16 : 24 }}>
+            {tabPanel === "clientes" && (
+              <div style={{ background: "#0d1117", border: "1px solid #1a2030", borderRadius: 16, padding: isMobile ? 16 : 24 }}>
               <div style={{ position: "relative", marginBottom: 16 }}>
                 <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#555", fontSize: 16 }}>🔍</span>
                 <input placeholder="Buscar cliente..." value={busqueda} onChange={e => setBusqueda(e.target.value)}
@@ -819,16 +820,15 @@ function AdminView({ onLogout }) {
                     <div>
                       <div style={{ fontWeight: 600, color: "#fff", fontSize: 14 }}>{c.nombre}</div>
                       <div style={{ fontSize: 11, marginTop: 2, color: c.estadoMes === "pagado" ? "#10b981" : c.estadoMes === "pendiente" ? "#ef4444" : "#555" }}>
-                        {c.estadoMes === "pagado" ? "✓ Al día" : c.estadoMes === "pendiente" ? "⚠ Pago pendiente" : c.email}
+                        {c.estadoMes === "pagado" ? "Al dia" : c.estadoMes === "pendiente" ? "Pago pendiente" : c.email}
                       </div>
                     </div>
                   </div>
-                  <span style={{ fontSize: 13, color: "#3b82f6", flexShrink: 0 }}>Ver →</span>
+                  <span style={{ fontSize: 13, color: "#3b82f6", flexShrink: 0 }}>Ver</span>
                 </div>
               ))}
             </div>
-          </div>}
-          </>
+            )}          </>
         ) : (
           <>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
