@@ -386,6 +386,10 @@ function AdminView({ onLogout }) {
   const [newPago, setNewPago] = useState({ mes: "Enero", anio: new Date().getFullYear(), monto: "" });
   const [newCliente, setNewCliente] = useState({ nombre: "", email: "", password: "1234" });
   const [newCochera, setNewCochera] = useState({ nombre: "", tipo: "auto", monto_mensual: "" });
+  const [editCliente, setEditCliente] = useState(null);
+  const [editCochera, setEditCochera] = useState(null);
+  const [pagoParcial, setPagoParcial] = useState(null);
+  const [montoParcial, setMontoParcial] = useState("");
 
   useEffect(() => {
     const cargarClientes = async () => {
@@ -454,6 +458,29 @@ function AdminView({ onLogout }) {
     fetchDetalle(selected.id);
   };
 
+  const saveEditCliente = async () => {
+    if (!editCliente) return;
+    await supabase.from("clientes").update({ nombre: editCliente.nombre, email: editCliente.email, password: editCliente.password }).eq("id", editCliente.id);
+    setClientes(prev => prev.map(c => c.id === editCliente.id ? { ...c, ...editCliente } : c));
+    if (selected?.id === editCliente.id) setSelected(prev => ({ ...prev, ...editCliente }));
+    setEditCliente(null);
+  };
+
+  const saveEditCochera = async () => {
+    if (!editCochera) return;
+    await supabase.from("cocheras").update({ nombre: editCochera.nombre, tipo: editCochera.tipo, monto_mensual: Number(editCochera.monto_mensual) }).eq("id", editCochera.id);
+    setEditCochera(null);
+    fetchDetalle(selected.id);
+  };
+
+  const addPagoParcial = async () => {
+    if (!montoParcial || !pagoParcial) return;
+    await supabase.from("pagos").insert({ cliente_id: selected.id, mes: pagoParcial.mes, anio: pagoParcial.anio, monto: Number(montoParcial), estado: "pagado", metodo: "efectivo", fecha_pago: new Date().toISOString().split("T")[0] });
+    setPagoParcial(null);
+    setMontoParcial("");
+    fetchDetalle(selected.id);
+  };
+
   const deleteCochera = async (cocheraId, nombre) => {
     if (!window.confirm(`¿Eliminar "${nombre}"?`)) return;
     await supabase.from("cocheras").update({ activo: false }).eq("id", cocheraId);
@@ -471,6 +498,87 @@ function AdminView({ onLogout }) {
   return (
     <div style={{ minHeight: "100vh", minHeight: "100dvh", background: "#080b10", fontFamily: "'DM Sans', sans-serif", color: "#e5e5e5" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@700;800&display=swap'); *{box-sizing:border-box;margin:0;padding:0;} button{cursor:pointer;border:none;} select,input{outline:none;} ::-webkit-scrollbar{width:4px;} ::-webkit-scrollbar-track{background:#0d1117;} ::-webkit-scrollbar-thumb{background:#1e3a5f;border-radius:3px;}`}</style>
+
+      {/* Modal editar cliente */}
+      {editCliente && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 20 }}>
+          <div style={{ background: "#111118", border: "1px solid #1e1e2e", borderRadius: 20, padding: 28, width: "100%", maxWidth: 380 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <h3 style={{ fontFamily: "'Syne',sans-serif", fontSize: 18, fontWeight: 800, color: "#fff" }}>Editar cliente</h3>
+              <button onClick={() => setEditCliente(null)} style={{ background: "transparent", color: "#555", fontSize: 24, border: "none", cursor: "pointer" }}>×</button>
+            </div>
+            {[["Nombre completo","nombre"],["Email","email"],["Contraseña","password"]].map(([label, key]) => (
+              <div key={key} style={{ marginBottom: 12 }}>
+                <label style={{ display: "block", color: "#aaa", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>{label}</label>
+                <input value={editCliente[key] || ""} onChange={e => setEditCliente({...editCliente, [key]: e.target.value})}
+                  style={{ width: "100%", background: "#0d0d14", border: "1px solid #2a2a3e", borderRadius: 10, padding: "11px 14px", color: "#fff", fontSize: 14, outline: "none" }} />
+              </div>
+            ))}
+            <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+              <button onClick={() => setEditCliente(null)} style={{ flex: 1, padding: "11px", background: "#1a1a28", color: "#aaa", borderRadius: 10, fontWeight: 600, fontSize: 14, border: "none", cursor: "pointer" }}>Cancelar</button>
+              <button onClick={saveEditCliente} style={{ flex: 1, padding: "11px", background: "linear-gradient(135deg,#7c3aed,#4f46e5)", color: "#fff", borderRadius: 10, fontWeight: 700, fontSize: 14, border: "none", cursor: "pointer" }}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal editar cochera */}
+      {editCochera && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 20 }}>
+          <div style={{ background: "#111118", border: "1px solid #1e1e2e", borderRadius: 20, padding: 28, width: "100%", maxWidth: 380 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <h3 style={{ fontFamily: "'Syne',sans-serif", fontSize: 18, fontWeight: 800, color: "#fff" }}>Editar lugar</h3>
+              <button onClick={() => setEditCochera(null)} style={{ background: "transparent", color: "#555", fontSize: 24, border: "none", cursor: "pointer" }}>×</button>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", color: "#aaa", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>Nombre / Número</label>
+              <input value={editCochera.nombre || ""} onChange={e => setEditCochera({...editCochera, nombre: e.target.value})}
+                style={{ width: "100%", background: "#0d0d14", border: "1px solid #2a2a3e", borderRadius: 10, padding: "11px 14px", color: "#fff", fontSize: 14, outline: "none" }} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "block", color: "#aaa", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>Tipo</label>
+              <select value={editCochera.tipo} onChange={e => setEditCochera({...editCochera, tipo: e.target.value})}
+                style={{ width: "100%", background: "#0d0d14", border: "1px solid #2a2a3e", borderRadius: 10, padding: "11px 14px", color: "#fff", fontSize: 14, outline: "none" }}>
+                {["auto","moto","camioneta","otro"].map(t => <option key={t} style={{ background: "#0d0d14" }}>{t}</option>)}
+              </select>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: "block", color: "#aaa", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>Monto mensual $</label>
+              <input type="number" value={editCochera.monto_mensual || ""} onChange={e => setEditCochera({...editCochera, monto_mensual: e.target.value})}
+                style={{ width: "100%", background: "#0d0d14", border: "1px solid #2a2a3e", borderRadius: 10, padding: "11px 14px", color: "#fff", fontSize: 14, outline: "none" }} />
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setEditCochera(null)} style={{ flex: 1, padding: "11px", background: "#1a1a28", color: "#aaa", borderRadius: 10, fontWeight: 600, fontSize: 14, border: "none", cursor: "pointer" }}>Cancelar</button>
+              <button onClick={saveEditCochera} style={{ flex: 1, padding: "11px", background: "linear-gradient(135deg,#7c3aed,#4f46e5)", color: "#fff", borderRadius: 10, fontWeight: 700, fontSize: 14, border: "none", cursor: "pointer" }}>Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal pago parcial */}
+      {pagoParcial && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 20 }}>
+          <div style={{ background: "#111118", border: "1px solid #1e1e2e", borderRadius: 20, padding: 28, width: "100%", maxWidth: 360 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+              <h3 style={{ fontFamily: "'Syne',sans-serif", fontSize: 18, fontWeight: 800, color: "#fff" }}>Pago parcial</h3>
+              <button onClick={() => { setPagoParcial(null); setMontoParcial(""); }} style={{ background: "transparent", color: "#555", fontSize: 24, border: "none", cursor: "pointer" }}>×</button>
+            </div>
+            <div style={{ background: "#1a1020", border: "1px solid #3b1f63", borderRadius: 10, padding: "10px 14px", marginBottom: 16, textAlign: "center" }}>
+              <div style={{ color: "#aaa", fontSize: 12 }}>Cuota pendiente</div>
+              <div style={{ color: "#a78bfa", fontSize: 22, fontWeight: 800 }}>{fmt(pagoParcial.monto)}</div>
+              <div style={{ color: "#666", fontSize: 12 }}>{pagoParcial.mes} {pagoParcial.anio}</div>
+            </div>
+            <label style={{ display: "block", color: "#aaa", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>Monto parcial a registrar $</label>
+            <input type="number" value={montoParcial} placeholder="Ej: 5000" onChange={e => setMontoParcial(e.target.value)}
+              style={{ width: "100%", background: "#0d0d14", border: "1px solid #2a2a3e", borderRadius: 10, padding: "12px 14px", color: "#fff", fontSize: 15, outline: "none", marginBottom: 16 }} />
+            <p style={{ color: "#555", fontSize: 12, marginBottom: 16, lineHeight: 1.4 }}>Se va a registrar como un pago adicional en efectivo del mismo mes. La cuota original sigue pendiente hasta que la marques como pagada.</p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => { setPagoParcial(null); setMontoParcial(""); }} style={{ flex: 1, padding: "11px", background: "#1a1a28", color: "#aaa", borderRadius: 10, fontWeight: 600, fontSize: 14, border: "none", cursor: "pointer" }}>Cancelar</button>
+              <button onClick={addPagoParcial} style={{ flex: 1, padding: "11px", background: "linear-gradient(135deg,#7c3aed,#4f46e5)", color: "#fff", borderRadius: 10, fontWeight: 700, fontSize: 14, border: "none", cursor: "pointer" }}>Registrar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div style={{ background: "#0d1117", borderBottom: "1px solid #1a2030", padding: isMobile ? "12px 16px" : "16px 32px", display: "flex", alignItems: "center", justifyContent: "space-between", position: "fixed", top: 0, left: 0, right: 0, zIndex: 50 }}>
@@ -540,15 +648,21 @@ function AdminView({ onLogout }) {
                 {c.estadoMes === "pagado" ? "Al día ✓" : c.estadoMes === "pendiente" ? "Pago pendiente" : "Sin cuota"}
               </div>
             </div>
-            <button onClick={async (e) => {
-              e.stopPropagation();
-              if (!window.confirm(`¿Eliminar a ${c.nombre}?`)) return;
-              await supabase.from("clientes").delete().eq("id", c.id);
-              setClientes(prev => prev.filter(x => x.id !== c.id));
-              if (selected?.id === c.id) setSelected(null);
-            }} style={{ marginTop: 4, background: "transparent", color: "#ef4444", fontSize: 11, fontWeight: 600, padding: 0, border: "none", cursor: "pointer" }}>
-              🗑 Eliminar
-            </button>
+            <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+              <button onClick={(e) => { e.stopPropagation(); setEditCliente({...c}); }}
+                style={{ background: "transparent", color: "#60a5fa", fontSize: 11, fontWeight: 600, padding: 0, border: "none", cursor: "pointer" }}>
+                ✏️ Editar
+              </button>
+              <button onClick={async (e) => {
+                e.stopPropagation();
+                if (!window.confirm(`¿Eliminar a ${c.nombre}?`)) return;
+                await supabase.from("clientes").delete().eq("id", c.id);
+                setClientes(prev => prev.filter(x => x.id !== c.id));
+                if (selected?.id === c.id) setSelected(null);
+              }} style={{ background: "transparent", color: "#ef4444", fontSize: 11, fontWeight: 600, padding: 0, border: "none", cursor: "pointer" }}>
+                🗑 Eliminar
+              </button>
+            </div>
           </div>
         ))}
       </div>
@@ -641,7 +755,8 @@ function AdminView({ onLogout }) {
                         <div style={{ fontWeight: 700, color: "#fff", fontSize: 13 }}>{c.nombre}</div>
                         <div style={{ fontSize: 11, color: "#555", textTransform: "capitalize" }}>{c.tipo} · {fmt(c.monto_mensual)}/mes</div>
                       </div>
-                      <button onClick={() => deleteCochera(c.id, c.nombre)} style={{ background: "transparent", color: "#ef4444", fontSize: 18, padding: "0 0 0 6px", border: "none", cursor: "pointer", lineHeight: 1 }}>×</button>
+                      <button onClick={() => setEditCochera({...c})} style={{ background: "transparent", color: "#60a5fa", fontSize: 13, padding: "0 4px", border: "none", cursor: "pointer" }}>✏️</button>
+                      <button onClick={() => deleteCochera(c.id, c.nombre)} style={{ background: "transparent", color: "#ef4444", fontSize: 18, padding: "0 0 0 4px", border: "none", cursor: "pointer", lineHeight: 1 }}>×</button>
                     </div>
                   ))}
                 </div>
@@ -699,10 +814,16 @@ function AdminView({ onLogout }) {
                       {p.estado === "pendiente" && (
                         confirmId === p.id
                           ? <span style={{ color: "#34d399", fontSize: 12, fontWeight: 700 }}>¡Marcado! ✓</span>
-                          : <button onClick={() => markEfectivo(p.id)}
-                              style={{ background: "#064e3b", color: "#34d399", padding: "5px 10px", borderRadius: 7, fontWeight: 700, fontSize: 11, whiteSpace: "nowrap" }}>
-                              💵 Efectivo
-                            </button>
+                          : <div style={{ display: "flex", gap: 5, flexDirection: "column" }}>
+                              <button onClick={() => markEfectivo(p.id)}
+                                style={{ background: "#064e3b", color: "#34d399", padding: "5px 10px", borderRadius: 7, fontWeight: 700, fontSize: 11, whiteSpace: "nowrap", border: "none", cursor: "pointer" }}>
+                                💵 Pagado
+                              </button>
+                              <button onClick={() => { setPagoParcial(p); setMontoParcial(""); }}
+                                style={{ background: "#1e3a5f", color: "#60a5fa", padding: "5px 10px", borderRadius: 7, fontWeight: 700, fontSize: 11, whiteSpace: "nowrap", border: "none", cursor: "pointer" }}>
+                                💸 Parcial
+                              </button>
+                            </div>
                       )}
                     </div>
                   </div>
