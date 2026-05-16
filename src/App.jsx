@@ -242,9 +242,8 @@ function ClientView({ user, onLogout }) {
         )}
 
         {/* Stats */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: isMobile ? 8 : 16, marginBottom: 20 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: isMobile ? 8 : 16, marginBottom: 20 }}>
           {[
-            { label: "Total pagado", val: fmt(pagados.reduce((a,p)=>a+Number(p.monto),0)), color: "#10b981" },
             { label: "Pendiente", val: fmt(pendientes.reduce((a,p)=>a+Number(p.monto),0)), color: "#f59e0b" },
             { label: "Cuota/mes", val: fmt(totalMensual), color: "#7c3aed" },
           ].map(st => (
@@ -320,10 +319,19 @@ function AdminView({ onLogout }) {
   const [newCochera, setNewCochera] = useState({ nombre: "", tipo: "auto", monto_mensual: "" });
 
   useEffect(() => {
-    supabase.from("clientes").select("*").order("nombre", { nullsFirst: false }).then(({ data }) => {
-      setClientes((data || []).filter(c => c.nombre));
+    const cargarClientes = async () => {
+      const { data: clientesData } = await supabase.from("clientes").select("*").order("nombre", { nullsFirst: false });
+      const clientes = (clientesData || []).filter(c => c.nombre);
+      // Cargar estado de pagos del mes actual para cada cliente
+      const mes = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][new Date().getMonth()];
+      const anio = new Date().getFullYear();
+      const { data: pagosData } = await supabase.from("pagos").select("cliente_id, estado").eq("mes", mes).eq("anio", anio);
+      const pagosMap = {};
+      (pagosData || []).forEach(p => { pagosMap[p.cliente_id] = p.estado; });
+      setClientes(clientes.map(c => ({ ...c, estadoMes: pagosMap[c.id] || "sin cuota" })));
       setLoadingClientes(false);
-    });
+    };
+    cargarClientes();
   }, []);
 
   const fetchDetalle = async (clienteId) => {
@@ -439,8 +447,13 @@ function AdminView({ onLogout }) {
         : clientes.map(c => (
           <div key={c.id} style={{ padding: "10px 12px", borderRadius: 10, marginBottom: 4, background: selected?.id===c.id ? "#131e35" : "transparent", border: selected?.id===c.id ? "1px solid #1e3a5f" : "1px solid transparent" }}>
             <div onClick={() => selectCliente(c)} style={{ cursor: "pointer" }}>
-              <div style={{ fontWeight: 600, color: "#fff", fontSize: 13 }}>{c.nombre}</div>
-              <div style={{ fontSize: 11, color: "#555", marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.email}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.estadoMes === "pagado" ? "#10b981" : c.estadoMes === "pendiente" ? "#ef4444" : "#555", flexShrink: 0, display: "inline-block" }} />
+                <div style={{ fontWeight: 600, color: "#fff", fontSize: 13 }}>{c.nombre}</div>
+              </div>
+              <div style={{ fontSize: 11, color: c.estadoMes === "pagado" ? "#10b981" : c.estadoMes === "pendiente" ? "#ef4444" : "#555", marginTop: 2, marginLeft: 14 }}>
+                {c.estadoMes === "pagado" ? "Al día ✓" : c.estadoMes === "pendiente" ? "Pago pendiente" : "Sin cuota"}
+              </div>
             </div>
             <button onClick={async (e) => {
               e.stopPropagation();
