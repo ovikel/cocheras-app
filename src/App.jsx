@@ -483,7 +483,9 @@ function AdminView({ onLogout }) {
                     <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#1e3a5f,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "#fff", flexShrink: 0 }}>{c.nombre[0]}</div>
                     <div>
                       <div style={{ fontWeight: 600, color: "#fff", fontSize: 14 }}>{c.nombre}</div>
-                      <div style={{ fontSize: 11, color: "#555" }}>{c.email}</div>
+                      <div style={{ fontSize: 11, marginTop: 2, color: c.estadoMes === "pagado" ? "#10b981" : c.estadoMes === "pendiente" ? "#ef4444" : "#555" }}>
+                        {c.estadoMes === "pagado" ? "✓ Al día" : c.estadoMes === "pendiente" ? "⚠ Pago pendiente" : c.email}
+                      </div>
                     </div>
                   </div>
                   <span style={{ fontSize: 13, color: "#3b82f6", flexShrink: 0 }}>Ver →</span>
