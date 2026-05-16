@@ -92,6 +92,72 @@ function ModalCambioPassword({ user, onClose }) {
   );
 }
 
+
+// ── MODAL PAGO ────────────────────────────────────────────────────────────────
+function ModalPago({ pago, onClose, onPagadoMP }) {
+  const [copiado, setCopiado] = useState(null);
+  const CBU = '0000003100005338259326';
+  const ALIAS = 'ezequiel.oviedo.mp';
+
+  const copiar = (texto, tipo) => {
+    navigator.clipboard.writeText(texto);
+    setCopiado(tipo);
+    setTimeout(() => setCopiado(null), 2000);
+  };
+
+  const fmt = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n);
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 20 }}>
+      <div style={{ background: '#111118', border: '1px solid #1e1e2e', borderRadius: 20, padding: 28, width: '100%', maxWidth: 400 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+          <h3 style={{ fontFamily: "'Syne',sans-serif", fontSize: 18, fontWeight: 800, color: '#fff' }}>Pagar cuota</h3>
+          <button onClick={onClose} style={{ background: 'transparent', color: '#555', fontSize: 24, lineHeight: 1, border: 'none', cursor: 'pointer' }}>x</button>
+        </div>
+
+        <div style={{ background: '#1a1020', border: '1px solid #3b1f63', borderRadius: 12, padding: '12px 16px', marginBottom: 20, textAlign: 'center' }}>
+          <div style={{ color: '#aaa', fontSize: 12, marginBottom: 4 }}>Monto a pagar</div>
+          <div style={{ color: '#a78bfa', fontSize: 28, fontWeight: 800 }}>{fmt(pago.monto)}</div>
+          <div style={{ color: '#666', fontSize: 12, marginTop: 2 }}>{pago.mes} {pago.anio}</div>
+        </div>
+
+        {/* Opción 1: Transferencia */}
+        <div style={{ background: '#0d1117', border: '1px solid #1a2030', borderRadius: 14, padding: 16, marginBottom: 12 }}>
+          <div style={{ fontWeight: 700, color: '#fff', fontSize: 14, marginBottom: 12 }}>🏦 Transferencia bancaria</div>
+          <div style={{ color: '#666', fontSize: 11, marginBottom: 4 }}>CBU / CVU</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#080b10', borderRadius: 8, padding: '10px 12px', marginBottom: 8 }}>
+            <span style={{ color: '#fff', fontSize: 13, fontFamily: 'monospace', letterSpacing: 1 }}>{CBU}</span>
+            <button onClick={() => copiar(CBU, 'cbu')} style={{ background: copiado === 'cbu' ? '#064e3b' : '#1e3a5f', color: copiado === 'cbu' ? '#34d399' : '#60a5fa', padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', flexShrink: 0, marginLeft: 8 }}>
+              {copiado === 'cbu' ? '✓ Copiado' : 'Copiar'}
+            </button>
+          </div>
+          <div style={{ color: '#666', fontSize: 11, marginBottom: 4 }}>Alias</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#080b10', borderRadius: 8, padding: '10px 12px' }}>
+            <span style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>{ALIAS}</span>
+            <button onClick={() => copiar(ALIAS, 'alias')} style={{ background: copiado === 'alias' ? '#064e3b' : '#1e3a5f', color: copiado === 'alias' ? '#34d399' : '#60a5fa', padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 700, border: 'none', cursor: 'pointer', flexShrink: 0, marginLeft: 8 }}>
+              {copiado === 'alias' ? '✓ Copiado' : 'Copiar'}
+            </button>
+          </div>
+          <p style={{ color: '#555', fontSize: 11, marginTop: 10, lineHeight: 1.4 }}>
+            Una vez realizada la transferencia el administrador confirmará el pago.
+          </p>
+        </div>
+
+        {/* Opción 2: Mercado Pago */}
+        <div style={{ background: '#0d1117', border: '1px solid #1a2030', borderRadius: 14, padding: 16 }}>
+          <div style={{ fontWeight: 700, color: '#fff', fontSize: 14, marginBottom: 8 }}>💙 Mercado Pago</div>
+          <p style={{ color: '#666', fontSize: 12, marginBottom: 12, lineHeight: 1.4 }}>
+            Enviá dinero a <strong style={{ color: '#fff' }}>{ALIAS}</strong> directamente desde tu app de Mercado Pago.
+          </p>
+          <button onClick={() => copiar(ALIAS, 'mp')} style={{ width: '100%', background: '#009ee3', color: '#fff', padding: '11px', borderRadius: 10, fontWeight: 700, fontSize: 14, border: 'none', cursor: 'pointer' }}>
+            {copiado === 'mp' ? '✓ Alias copiado!' : '📋 Copiar alias de MP'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── LOGIN ─────────────────────────────────────────────────────────────────────
 function Login({ onLogin }) {
   const [email, setEmail] = useState("");
@@ -153,6 +219,7 @@ function ClientView({ user, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [payingId, setPayingId] = useState(null);
   const [showCambioPass, setShowCambioPass] = useState(false);
+  const [pagoModal, setPagoModal] = useState(null);
   const [showMenu, setShowMenu] = useState(false);
   const [currentUser, setCurrentUser] = useState(user);
 
@@ -186,6 +253,7 @@ function ClientView({ user, onLogout }) {
     <div style={{ minHeight: "100vh", minHeight: "100dvh", background: "#0a0a0f", fontFamily: "'DM Sans', sans-serif", color: "#e5e5e5" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@700;800&display=swap'); *{box-sizing:border-box;margin:0;padding:0;} button{cursor:pointer;border:none;} ::-webkit-scrollbar{width:4px;} ::-webkit-scrollbar-track{background:#111;} ::-webkit-scrollbar-thumb{background:#333;border-radius:3px;}`}</style>
 
+      {pagoModal && <ModalPago pago={pagoModal} onClose={() => setPagoModal(null)} />}
       {showCambioPass && <ModalCambioPassword user={currentUser} onClose={() => {
         setShowCambioPass(false);
         supabase.from("clientes").select("*").eq("id", user.id).single().then(({ data }) => { if (data) setCurrentUser({ ...data, role: "client" }); });
@@ -285,7 +353,7 @@ function ClientView({ user, onLogout }) {
                     <Badge status={p.estado} />
                   </div>
                   {p.estado === "pendiente" && (
-                    <button onClick={() => handlePagar(p)} disabled={payingId===p.id}
+                    <button onClick={() => setPagoModal(p)}
                       style={{ padding: isMobile ? "7px 12px" : "8px 18px", borderRadius: 8, fontWeight: 700, fontSize: isMobile ? 12 : 13, border: "none", background: "linear-gradient(135deg,#7c3aed,#4f46e5)", color: "#fff", opacity: payingId===p.id ? .6 : 1, whiteSpace: "nowrap" }}>
                       {payingId === p.id ? "..." : "💳 Pagar"}
                     </button>
