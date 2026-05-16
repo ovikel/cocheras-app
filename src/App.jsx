@@ -390,6 +390,8 @@ function AdminView({ onLogout }) {
   const [editCochera, setEditCochera] = useState(null);
   const [pagoParcial, setPagoParcial] = useState(null);
   const [montoParcial, setMontoParcial] = useState("");
+  const [tabPanel, setTabPanel] = useState("clientes");
+  const [analytics, setAnalytics] = useState(null);
 
   useEffect(() => {
     const cargarClientes = async () => {
@@ -405,7 +407,40 @@ function AdminView({ onLogout }) {
       setLoadingClientes(false);
     };
     cargarClientes();
+    cargarAnalytics();
   }, []);
+
+  const cargarAnalytics = async () => {
+    const mes = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][new Date().getMonth()];
+    const anio = new Date().getFullYear();
+    const { data: todosPagos } = await supabase.from("pagos").select("*").eq("anio", anio);
+    const { data: clientesData } = await supabase.from("clientes").select("id").eq("activo", true);
+    const { data: cocherasData } = await supabase.from("cocheras").select("monto_mensual").eq("activo", true);
+    
+    const pagosMes = (todosPagos || []).filter(p => p.mes === mes);
+    const pagadosMes = pagosMes.filter(p => p.estado === "pagado");
+    const pendientesMes = pagosMes.filter(p => p.estado === "pendiente");
+    const totalAnio = (todosPagos || []).filter(p => p.estado === "pagado").reduce((a,p) => a + Number(p.monto), 0);
+    
+    // Recaudacion por mes del año
+    const meses = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+    const recaudacionPorMes = meses.map(m => ({
+      mes: m.substring(0,3),
+      total: (todosPagos || []).filter(p => p.mes === m && p.estado === "pagado").reduce((a,p) => a + Number(p.monto), 0)
+    }));
+
+    setAnalytics({
+      mes,
+      totalCobradoMes: pagadosMes.reduce((a,p) => a + Number(p.monto), 0),
+      totalPendienteMes: pendientesMes.reduce((a,p) => a + Number(p.monto), 0),
+      cantPagadosMes: pagadosMes.length,
+      cantPendientesMes: pendientesMes.length,
+      totalClientes: (clientesData || []).length,
+      totalAnio,
+      cuotaMensualTotal: (cocherasData || []).reduce((a,c) => a + Number(c.monto_mensual), 0),
+      recaudacionPorMes,
+    });
+  };
 
   const fetchDetalle = async (clienteId) => {
     setLoadingDetalle(true);
@@ -671,8 +706,105 @@ function AdminView({ onLogout }) {
       <div style={{ marginLeft: isMobile ? 0 : SIDEBAR_W, padding: isMobile ? "70px 14px 30px" : "80px 28px 40px" }}>
         {!selected ? (
           <>
-            <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: isMobile ? 20 : 24, fontWeight: 800, color: "#fff", marginBottom: 20 }}>Panel de control</h2>
-            <div style={{ background: "#0d1117", border: "1px solid #1a2030", borderRadius: 16, padding: isMobile ? 16 : 24 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 10 }}>
+              <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: isMobile ? 20 : 24, fontWeight: 800, color: "#fff" }}>Panel de control</h2>
+              <div style={{ display: "flex", gap: 6, background: "#0d1117", border: "1px solid #1a2030", borderRadius: 10, padding: 4 }}>
+                <button onClick={() => setTabPanel("clientes")} style={{ padding: "7px 16px", borderRadius: 7, fontWeight: 600, fontSize: 13, border: "none", cursor: "pointer", background: tabPanel==="clientes" ? "linear-gradient(135deg,#7c3aed,#4f46e5)" : "transparent", color: tabPanel==="clientes" ? "#fff" : "#666" }}>👥 Clientes</button>
+                <button onClick={() => setTabPanel("analytics")} style={{ padding: "7px 16px", borderRadius: 7, fontWeight: 600, fontSize: 13, border: "none", cursor: "pointer", background: tabPanel==="analytics" ? "linear-gradient(135deg,#7c3aed,#4f46e5)" : "transparent", color: tabPanel==="analytics" ? "#fff" : "#666" }}>📊 Analítico</button>
+              </div>
+            </div>
+
+            {tabPanel === "analytics" && analytics && (
+              <>
+                {/* Stats principales */}
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4,1fr)", gap: 12, marginBottom: 16 }}>
+                  {[
+                    { icon: "💰", label: `Cobrado en ${analytics.mes}`, val: fmt(analytics.totalCobradoMes), color: "#34d399", bg: "#052e16" },
+                    { icon: "⏳", label: `Pendiente en ${analytics.mes}`, val: fmt(analytics.totalPendienteMes), color: "#f59e0b", bg: "#431407" },
+                    { icon: "📅", label: "Cobrado en el año", val: fmt(analytics.totalAnio), color: "#a78bfa", bg: "#1a1020" },
+                    { icon: "🎯", label: "Cuota mensual total", val: fmt(analytics.cuotaMensualTotal), color: "#60a5fa", bg: "#0c1a2e" },
+                  ].map(s => (
+                    <div key={s.label} style={{ background: s.bg, border: `1px solid ${s.color}22`, borderRadius: 14, padding: "16px 18px" }}>
+                      <div style={{ fontSize: 22, marginBottom: 6 }}>{s.icon}</div>
+                      <div style={{ color: "#666", fontSize: 10, fontWeight: 700, letterSpacing: .8, textTransform: "uppercase", marginBottom: 4 }}>{s.label}</div>
+                      <div style={{ fontSize: isMobile ? 16 : 20, fontWeight: 800, color: s.color }}>{s.val}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Porcentajes del mes */}
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12, marginBottom: 16 }}>
+                  <div style={{ background: "#0d1117", border: "1px solid #1a2030", borderRadius: 14, padding: "20px 22px" }}>
+                    <div style={{ fontWeight: 700, color: "#fff", marginBottom: 16, fontSize: 14 }}>📈 Estado del mes — {analytics.mes}</div>
+                    {(() => {
+                      const total = analytics.cantPagadosMes + analytics.cantPendientesMes;
+                      const pct = total > 0 ? Math.round(analytics.cantPagadosMes / total * 100) : 0;
+                      return (
+                        <>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                            <span style={{ color: "#10b981", fontSize: 13, fontWeight: 600 }}>✓ Pagados: {analytics.cantPagadosMes}</span>
+                            <span style={{ color: "#ef4444", fontSize: 13, fontWeight: 600 }}>⏳ Pendientes: {analytics.cantPendientesMes}</span>
+                          </div>
+                          <div style={{ background: "#1a2030", borderRadius: 99, height: 12, overflow: "hidden", marginBottom: 8 }}>
+                            <div style={{ height: "100%", width: `${pct}%`, background: "linear-gradient(90deg,#10b981,#34d399)", borderRadius: 99, transition: "width .5s" }} />
+                          </div>
+                          <div style={{ textAlign: "center", color: pct >= 70 ? "#10b981" : pct >= 40 ? "#f59e0b" : "#ef4444", fontSize: 28, fontWeight: 800 }}>{pct}%</div>
+                          <div style={{ textAlign: "center", color: "#555", fontSize: 12 }}>de cobro completado</div>
+                        </>
+                      );
+                    })()}
+                  </div>
+
+                  <div style={{ background: "#0d1117", border: "1px solid #1a2030", borderRadius: 14, padding: "20px 22px" }}>
+                    <div style={{ fontWeight: 700, color: "#fff", marginBottom: 16, fontSize: 14 }}>👥 Resumen general</div>
+                    {[
+                      { label: "Clientes activos", val: analytics.totalClientes, icon: "👤" },
+                      { label: "Pagaron este mes", val: analytics.cantPagadosMes, icon: "✅" },
+                      { label: "Deben este mes", val: analytics.cantPendientesMes, icon: "🔴" },
+                      { label: "Sin cuota generada", val: analytics.totalClientes - analytics.cantPagadosMes - analytics.cantPendientesMes, icon: "⚪" },
+                    ].map(r => (
+                      <div key={r.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid #151d2a" }}>
+                        <span style={{ color: "#aaa", fontSize: 13 }}>{r.icon} {r.label}</span>
+                        <span style={{ color: "#fff", fontWeight: 700, fontSize: 15 }}>{r.val}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Gráfico de barras por mes */}
+                <div style={{ background: "#0d1117", border: "1px solid #1a2030", borderRadius: 14, padding: "20px 22px" }}>
+                  <div style={{ fontWeight: 700, color: "#fff", marginBottom: 20, fontSize: 14 }}>📊 Recaudación mensual {new Date().getFullYear()}</div>
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: isMobile ? 4 : 8, height: 120 }}>
+                    {(() => {
+                      const max = Math.max(...analytics.recaudacionPorMes.map(m => m.total), 1);
+                      const mesActual = analytics.mes.substring(0,3);
+                      return analytics.recaudacionPorMes.map((m, i) => (
+                        <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                          <div style={{ fontSize: 9, color: "#555", fontWeight: 600 }}>
+                            {m.total > 0 ? `$${Math.round(m.total/1000)}k` : ""}
+                          </div>
+                          <div style={{
+                            width: "100%", borderRadius: "4px 4px 0 0",
+                            height: `${Math.max(m.total / max * 90, m.total > 0 ? 4 : 0)}px`,
+                            background: m.mes === mesActual ? "linear-gradient(180deg,#7c3aed,#4f46e5)" : m.total > 0 ? "#1e3a5f" : "#0d1117",
+                            border: m.mes === mesActual ? "none" : m.total > 0 ? "1px solid #1e3a5f" : "1px solid #151d2a",
+                            transition: "height .4s",
+                            minHeight: 3
+                          }} />
+                          <div style={{ fontSize: isMobile ? 8 : 9, color: m.mes === mesActual ? "#a78bfa" : "#555", fontWeight: m.mes === mesActual ? 700 : 400 }}>{m.mes}</div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {tabPanel === "analytics" && !analytics && (
+              <div style={{ textAlign: "center", color: "#555", padding: 40 }}>Cargando analítico...</div>
+            )}
+
+            {tabPanel === "clientes" && <div style={{ background: "#0d1117", border: "1px solid #1a2030", borderRadius: 16, padding: isMobile ? 16 : 24 }}>
               <div style={{ position: "relative", marginBottom: 16 }}>
                 <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#555", fontSize: 16 }}>🔍</span>
                 <input placeholder="Buscar cliente..." value={busqueda} onChange={e => setBusqueda(e.target.value)}
@@ -695,6 +827,7 @@ function AdminView({ onLogout }) {
                 </div>
               ))}
             </div>
+            </div>}
           </>
         ) : (
           <>
