@@ -387,6 +387,8 @@ function AdminView({ onLogout }) {
   const [newCliente, setNewCliente] = useState({ nombre: "", email: "", password: "1234" });
   const [newCochera, setNewCochera] = useState({ nombre: "", tipo: "auto", monto_mensual: "" });
   const [editCliente, setEditCliente] = useState(null);
+  const [fotoPreview, setFotoPreview] = useState(null);
+  const [uploadingFoto, setUploadingFoto] = useState(null);
   const [editCochera, setEditCochera] = useState(null);
   const [pagoParcial, setPagoParcial] = useState(null);
   const [montoParcial, setMontoParcial] = useState("");
@@ -493,9 +495,26 @@ function AdminView({ onLogout }) {
     fetchDetalle(selected.id);
   };
 
+  const handleFotoUpload = async (clienteId, file) => {
+    if (!file) return;
+    setUploadingFoto(clienteId);
+    const ext = file.name.split(".").pop();
+    const path = `fotos/${clienteId}.${ext}`;
+    const { error } = await supabase.storage.from("clientes").upload(path, file, { upsert: true });
+    if (!error) {
+      const { data } = supabase.storage.from("clientes").getPublicUrl(path);
+      const url = data.publicUrl + "?t=" + Date.now();
+      await supabase.from("clientes").update({ foto_url: url }).eq("id", clienteId);
+      setClientes(prev => prev.map(c => c.id === clienteId ? { ...c, foto_url: url } : c));
+      if (selected?.id === clienteId) setSelected(prev => ({ ...prev, foto_url: url }));
+      if (editCliente?.id === clienteId) setEditCliente(prev => ({ ...prev, foto_url: url }));
+    }
+    setUploadingFoto(null);
+  };
+
   const saveEditCliente = async () => {
     if (!editCliente) return;
-    await supabase.from("clientes").update({ nombre: editCliente.nombre, email: editCliente.email, password: editCliente.password }).eq("id", editCliente.id);
+    await supabase.from("clientes").update({ nombre: editCliente.nombre, email: editCliente.email, password: editCliente.password, telefono: editCliente.telefono, domicilio: editCliente.domicilio }).eq("id", editCliente.id);
     setClientes(prev => prev.map(c => c.id === editCliente.id ? { ...c, ...editCliente } : c));
     if (selected?.id === editCliente.id) setSelected(prev => ({ ...prev, ...editCliente }));
     setEditCliente(null);
@@ -536,13 +555,38 @@ function AdminView({ onLogout }) {
 
       {/* Modal editar cliente */}
       {editCliente && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.8)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 20 }}>
-          <div style={{ background: "#111118", border: "1px solid #1e1e2e", borderRadius: 20, padding: 28, width: "100%", maxWidth: 380 }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 20, overflowY: "auto" }}>
+          <div style={{ background: "#111118", border: "1px solid #1e1e2e", borderRadius: 20, padding: 28, width: "100%", maxWidth: 420, margin: "auto" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
               <h3 style={{ fontFamily: "'Syne',sans-serif", fontSize: 18, fontWeight: 800, color: "#fff" }}>Editar cliente</h3>
-              <button onClick={() => setEditCliente(null)} style={{ background: "transparent", color: "#555", fontSize: 24, border: "none", cursor: "pointer" }}>×</button>
+              <button onClick={() => setEditCliente(null)} style={{ background: "transparent", color: "#555", fontSize: 24, border: "none", cursor: "pointer" }}>x</button>
             </div>
-            {[["Nombre completo","nombre"],["Email","email"],["Contraseña","password"]].map(([label, key]) => (
+
+            {/* Foto de perfil */}
+            <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20, padding: 16, background: "#0d0d14", borderRadius: 14 }}>
+              <div style={{ position: "relative", flexShrink: 0 }}>
+                {editCliente.foto_url ? (
+                  <img src={editCliente.foto_url} alt="" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover", border: "2px solid #7c3aed" }} />
+                ) : (
+                  <div style={{ width: 72, height: 72, borderRadius: "50%", background: "linear-gradient(135deg,#7c3aed,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, fontWeight: 700, color: "#fff" }}>
+                    {editCliente.nombre ? editCliente.nombre[0] : "?"}
+                  </div>
+                )}
+                {uploadingFoto === editCliente.id && (
+                  <div style={{ position: "absolute", inset: 0, borderRadius: "50%", background: "rgba(0,0,0,.6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#fff" }}>...</div>
+                )}
+              </div>
+              <div>
+                <div style={{ color: "#fff", fontWeight: 600, fontSize: 14, marginBottom: 6 }}>Foto de perfil</div>
+                <label style={{ background: "#1e3a5f", color: "#60a5fa", padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                  Subir foto
+                  <input type="file" accept="image/*" style={{ display: "none" }} onChange={e => handleFotoUpload(editCliente.id, e.target.files[0])} />
+                </label>
+              </div>
+            </div>
+
+            {/* Campos */}
+            {[["Nombre completo","nombre"],["Email","email"],["Contrasena","password"],["Telefono","telefono"],["Domicilio","domicilio"]].map(([label, key]) => (
               <div key={key} style={{ marginBottom: 12 }}>
                 <label style={{ display: "block", color: "#aaa", fontSize: 12, fontWeight: 600, marginBottom: 5 }}>{label}</label>
                 <input value={editCliente[key] || ""} onChange={e => setEditCliente({...editCliente, [key]: e.target.value})}
@@ -553,6 +597,17 @@ function AdminView({ onLogout }) {
               <button onClick={() => setEditCliente(null)} style={{ flex: 1, padding: "11px", background: "#1a1a28", color: "#aaa", borderRadius: 10, fontWeight: 600, fontSize: 14, border: "none", cursor: "pointer" }}>Cancelar</button>
               <button onClick={saveEditCliente} style={{ flex: 1, padding: "11px", background: "linear-gradient(135deg,#7c3aed,#4f46e5)", color: "#fff", borderRadius: 10, fontWeight: 700, fontSize: 14, border: "none", cursor: "pointer" }}>Guardar</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal preview foto */}
+      {fotoPreview && (
+        <div onClick={() => setFotoPreview(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.92)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300, cursor: "pointer" }}>
+          <div style={{ textAlign: "center" }}>
+            <img src={fotoPreview.url} alt="" style={{ width: "min(80vw, 400px)", height: "min(80vw, 400px)", borderRadius: "50%", objectFit: "cover", border: "3px solid #7c3aed", boxShadow: "0 0 60px rgba(124,58,237,.4)" }} />
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: 18, marginTop: 16, fontFamily: "'Syne',sans-serif" }}>{fotoPreview.nombre}</div>
+            <div style={{ color: "#666", fontSize: 13, marginTop: 4 }}>Toca para cerrar</div>
           </div>
         </div>
       )}
@@ -674,13 +729,21 @@ function AdminView({ onLogout }) {
         : clientesFiltrados.length === 0 ? <div style={{ color: "#555", fontSize: 13, padding: 8, textAlign: "center" }}>Sin resultados</div>
         : clientesFiltrados.map(c => (
           <div key={c.id} style={{ padding: "10px 12px", borderRadius: 10, marginBottom: 4, background: selected?.id===c.id ? "#131e35" : "transparent", border: selected?.id===c.id ? "1px solid #1e3a5f" : "1px solid transparent" }}>
-            <div onClick={() => selectCliente(c)} style={{ cursor: "pointer" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 8, height: 8, borderRadius: "50%", background: c.estadoMes === "pagado" ? "#10b981" : c.estadoMes === "pendiente" ? "#ef4444" : "#555", flexShrink: 0, display: "inline-block" }} />
-                <div style={{ fontWeight: 600, color: "#fff", fontSize: 13 }}>{c.nombre}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <div onClick={(e) => { e.stopPropagation(); if(c.foto_url) setFotoPreview({url: c.foto_url, nombre: c.nombre}); }}
+                style={{ flexShrink: 0, cursor: c.foto_url ? "zoom-in" : "default", position: "relative" }}>
+                {c.foto_url ? (
+                  <img src={c.foto_url} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", border: "2px solid #7c3aed" }} />
+                ) : (
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg,#1e3a5f,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "#fff", fontSize: 14 }}>{c.nombre[0]}</div>
+                )}
+                <span style={{ position: "absolute", bottom: 0, right: 0, width: 10, height: 10, borderRadius: "50%", background: c.estadoMes === "pagado" ? "#10b981" : c.estadoMes === "pendiente" ? "#ef4444" : "#555", border: "2px solid #0d1117" }} />
               </div>
-              <div style={{ fontSize: 11, color: c.estadoMes === "pagado" ? "#10b981" : c.estadoMes === "pendiente" ? "#ef4444" : "#555", marginTop: 2, marginLeft: 14 }}>
-                {c.estadoMes === "pagado" ? "Al día ✓" : c.estadoMes === "pendiente" ? "Pago pendiente" : "Sin cuota"}
+              <div onClick={() => selectCliente(c)} style={{ cursor: "pointer", flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 600, color: "#fff", fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.nombre}</div>
+                <div style={{ fontSize: 11, color: c.estadoMes === "pagado" ? "#10b981" : c.estadoMes === "pendiente" ? "#ef4444" : "#555", marginTop: 1 }}>
+                  {c.estadoMes === "pagado" ? "Al dia" : c.estadoMes === "pendiente" ? "Pago pendiente" : "Sin cuota"}
+                </div>
               </div>
             </div>
             <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
@@ -816,7 +879,15 @@ function AdminView({ onLogout }) {
               {clientesFiltrados.map((c, i) => (
                 <div key={c.id} onClick={() => selectCliente(c)} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: i<clientes.length-1 ? "1px solid #151d2a" : "none", cursor: "pointer" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ width: 34, height: 34, borderRadius: "50%", background: "linear-gradient(135deg,#1e3a5f,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "#fff", flexShrink: 0 }}>{c.nombre[0]}</div>
+                    <div onClick={(e) => { e.stopPropagation(); if(c.foto_url) setFotoPreview({url: c.foto_url, nombre: c.nombre}); }}
+                      style={{ flexShrink: 0, cursor: c.foto_url ? "zoom-in" : "default", position: "relative" }}>
+                      {c.foto_url ? (
+                        <img src={c.foto_url} alt="" style={{ width: 42, height: 42, borderRadius: "50%", objectFit: "cover", border: "2px solid #7c3aed" }} />
+                      ) : (
+                        <div style={{ width: 42, height: 42, borderRadius: "50%", background: "linear-gradient(135deg,#1e3a5f,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "#fff", fontSize: 16 }}>{c.nombre[0]}</div>
+                      )}
+                      <span style={{ position: "absolute", bottom: 0, right: 0, width: 11, height: 11, borderRadius: "50%", background: c.estadoMes === "pagado" ? "#10b981" : c.estadoMes === "pendiente" ? "#ef4444" : "#555", border: "2px solid #0d1117" }} />
+                    </div>
                     <div>
                       <div style={{ fontWeight: 600, color: "#fff", fontSize: 14 }}>{c.nombre}</div>
                       <div style={{ fontSize: 11, marginTop: 2, color: c.estadoMes === "pagado" ? "#10b981" : c.estadoMes === "pendiente" ? "#ef4444" : "#555" }}>
@@ -831,9 +902,24 @@ function AdminView({ onLogout }) {
             )}          </>
         ) : (
           <>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-              <button onClick={() => setSelected(null)} style={{ background: "#1a2030", color: "#aaa", padding: "7px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600 }}>←</button>
-              <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: isMobile ? 18 : 22, fontWeight: 800, color: "#fff" }}>{selected.nombre}</h2>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+              <button onClick={() => setSelected(null)} style={{ background: "#1a2030", color: "#aaa", padding: "7px 12px", borderRadius: 8, fontSize: 13, fontWeight: 600, border: "none", cursor: "pointer" }}>←</button>
+              <div onClick={() => { if(selected.foto_url) setFotoPreview({url: selected.foto_url, nombre: selected.nombre}); }}
+                style={{ flexShrink: 0, cursor: selected.foto_url ? "zoom-in" : "default", position: "relative" }}>
+                {selected.foto_url ? (
+                  <img src={selected.foto_url} alt="" style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover", border: "2px solid #7c3aed" }} />
+                ) : (
+                  <div style={{ width: 52, height: 52, borderRadius: "50%", background: "linear-gradient(135deg,#7c3aed,#4f46e5)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, color: "#fff", fontSize: 20 }}>{selected.nombre[0]}</div>
+                )}
+              </div>
+              <div>
+                <h2 style={{ fontFamily: "'Syne',sans-serif", fontSize: isMobile ? 18 : 22, fontWeight: 800, color: "#fff" }}>{selected.nombre}</h2>
+                <div style={{ display: "flex", gap: 12, marginTop: 3, flexWrap: "wrap" }}>
+                  {selected.telefono && <span style={{ fontSize: 12, color: "#60a5fa" }}>📞 {selected.telefono}</span>}
+                  {selected.domicilio && <span style={{ fontSize: 12, color: "#aaa" }}>📍 {selected.domicilio}</span>}
+                  {selected.email && <span style={{ fontSize: 12, color: "#555" }}>{selected.email}</span>}
+                </div>
+              </div>
             </div>
 
             {/* Stats */}
