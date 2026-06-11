@@ -468,6 +468,16 @@ function AdminView({ onLogout }) {
     setConfirmId(pagoId);
     await fetchDetalle(selected.id);
     setTimeout(() => setConfirmId(null), 2000);
+    // Actualizar estado del cliente en la lista y en el analítico
+    const mes = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][new Date().getMonth()];
+    const anio = new Date().getFullYear();
+    const { data: pagosMes } = await supabase.from("pagos").select("estado").eq("cliente_id", selected.id).eq("mes", mes).eq("anio", anio);
+    const todosPageados = pagosMes && pagosMes.length > 0 && pagosMes.every(p => p.estado === "pagado");
+    const hayPendiente = pagosMes && pagosMes.some(p => p.estado === "pendiente");
+    const nuevoEstado = todosPageados ? "pagado" : hayPendiente ? "pendiente" : "sin cuota";
+    setClientes(prev => prev.map(c => c.id === selected.id ? { ...c, estadoMes: nuevoEstado } : c));
+    // Actualizar analítico
+    cargarAnalytics();
   };
 
   const addPago = async () => {
@@ -475,7 +485,13 @@ function AdminView({ onLogout }) {
     await supabase.from("pagos").insert({ cliente_id: selected.id, mes: newPago.mes, anio: Number(newPago.anio), monto: Number(newPago.monto), estado: "pendiente" });
     setShowAddPago(false);
     setNewPago({ mes: "Enero", anio: new Date().getFullYear(), monto: "" });
-    fetchDetalle(selected.id);
+    await fetchDetalle(selected.id);
+    // Actualizar estado en lista si es el mes actual
+    const mesActual = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"][new Date().getMonth()];
+    if (newPago.mes === mesActual) {
+      setClientes(prev => prev.map(c => c.id === selected.id ? { ...c, estadoMes: "pendiente" } : c));
+      cargarAnalytics();
+    }
   };
 
   const addCliente = async () => {
@@ -532,7 +548,8 @@ function AdminView({ onLogout }) {
     await supabase.from("pagos").insert({ cliente_id: selected.id, mes: pagoParcial.mes, anio: pagoParcial.anio, monto: Number(montoParcial), estado: "pagado", metodo: "efectivo", fecha_pago: new Date().toISOString().split("T")[0] });
     setPagoParcial(null);
     setMontoParcial("");
-    fetchDetalle(selected.id);
+    await fetchDetalle(selected.id);
+    cargarAnalytics();
   };
 
   const deleteCochera = async (cocheraId, nombre) => {
@@ -1057,8 +1074,23 @@ function AdminView({ onLogout }) {
 }
 
 export default function App() {
-  const [user, setUser] = useState(null);
-  if (!user) return <Login onLogin={setUser} />;
-  if (user.role === "admin") return <AdminView onLogout={() => setUser(null)} />;
-  return <ClientView user={user} onLogout={() => setUser(null)} />;
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem("cocheras_user");
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  const handleLogin = (u) => {
+    setUser(u);
+    try { localStorage.setItem("cocheras_user", JSON.stringify(u)); } catch {}
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    try { localStorage.removeItem("cocheras_user"); } catch {}
+  };
+  if (!user) return <Login onLogin={handleLogin} />;
+  if (user.role === "admin") return <AdminView onLogout={handleLogout} />;
+  return <ClientView user={user} onLogout={handleLogout} />;
 }
